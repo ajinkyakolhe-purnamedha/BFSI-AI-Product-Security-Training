@@ -1,0 +1,36 @@
+[project]
+name = "chronos-wealth"
+version = "0.1.0"
+description = "Chronos Wealth Module 0 — wealth-management simulator for the 5-day AI engineering training"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "altair>=5.0.0",
+    "fastapi>=0.141.1",
+    "pandas>=3.0.5",
+    "pydantic>=2.13.4",
+    "requests>=2.34.2",
+    "sqlalchemy>=2.0.51",
+    "streamlit>=1.61.1",
+    "uvicorn>=0.52.1",
+    "yfinance>=1.5.2",
+]
+
+[project.optional-dependencies]
+m12 = [
+    "mcp[cli]>=2.0,<3",
+]
+ai = [
+    "llama-index-core>=0.14.25",
+    "llama-index-embeddings-ollama>=0.10.0",
+    "llama-index-llms-ollama>=0.11.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

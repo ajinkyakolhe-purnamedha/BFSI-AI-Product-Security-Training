@@ -1,0 +1,136 @@
+"""Database tables and session helpers for Chronos Wealth."""
+
+import os
+from datetime import date, datetime, timezone
+from pathlib import Path
+
+from sqlalchemy import (
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    create_engine,
+)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class Base(DeclarativeBase):
+    pass
+
+
+class User(Base):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    role: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
+
+
+class Account(Base):
+    __tablename__ = "accounts"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    cash_balance: Mapped[float] = mapped_column(Float, nullable=False)
+    initial_cash: Mapped[float] = mapped_column(Float, nullable=False)
+    simulated_date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
+
+
+class Asset(Base):
+    __tablename__ = "assets"
+    symbol: Mapped[str] = mapped_column(String, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    asset_class: Mapped[str] = mapped_column(String, nullable=False)
+    sector: Mapped[str | None] = mapped_column(String, nullable=True)
+    risk_level: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class Price(Base):
+    __tablename__ = "prices"
+    __table_args__ = (UniqueConstraint("symbol", "date", name="uq_prices_symbol_date"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    symbol: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    close: Mapped[float] = mapped_column(Float, nullable=False)
+    source: Mapped[str] = mapped_column(String, nullable=False)
+
+
+class Holding(Base):
+    __tablename__ = "holdings"
+    __table_args__ = (
+        UniqueConstraint("account_id", "symbol", name="uq_holdings_account_symbol"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    symbol: Mapped[str] = mapped_column(ForeignKey("assets.symbol"), nullable=False)
+    shares: Mapped[float] = mapped_column(Float, nullable=False)
+    average_cost: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class Trade(Base):
+    __tablename__ = "trades"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    symbol: Mapped[str] = mapped_column(ForeignKey("assets.symbol"), nullable=False)
+    side: Mapped[str] = mapped_column(String, nullable=False)
+    shares: Mapped[float] = mapped_column(Float, nullable=False)
+    price: Mapped[float] = mapped_column(Float, nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    simulated_date: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utc_now)
+
+
+class PortfolioValueSnapshot(Base):
+    """One recorded portfolio value per account and simulated date."""
+
+    __tablename__ = "portfolio_value_snapshots"
+    __table_args__ = (UniqueConstraint("account_id", "simulated_date"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"), nullable=False)
+    simulated_date: Mapped[date] = mapped_column(Date, nullable=False)
+    cash_balance: Mapped[float] = mapped_column(Float, nullable=False)
+    holdings_value: Mapped[float] = mapped_column(Float, nullable=False)
+    total_value: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_DATABASE_PATH = PROJECT_ROOT / "data" / "chronos.db"
+MARKET_PRICES_CSV_PATH = PROJECT_ROOT / "data" / "market" / "prices.csv"
+
+
+def _build_database_url() -> str:
+    configured_url = os.environ.get("CHRONOS_DATABASE_URL")
+    if configured_url:
+        return configured_url
+    DEFAULT_DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    return f"sqlite:///{DEFAULT_DATABASE_PATH}"
+
+
+DATABASE_URL = _build_database_url()
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+
+def create_database_tables() -> None:
+    Base.metadata.create_all(bind=engine)
+
+
+def get_database_session():
+    session = SessionLocal()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
