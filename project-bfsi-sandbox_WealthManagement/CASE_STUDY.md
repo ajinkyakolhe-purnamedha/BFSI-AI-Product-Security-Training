@@ -1,75 +1,97 @@
-# Chronos Wealth: AI Application Design Case Study
+# Chronos Wealth — Product Security Case Study
 
-## The company and its product
+**Assess the product that exists. Support each finding with source or runtime evidence.**
+Use the [README](README.md) to run it and the [project guide](PROJECT_GUIDE.md)
+to trace its implementation.
 
-Chronos Wealth is a digital wealth-management company. It helps individual investors understand and manage their investments, while giving financial advisors a secure view of the clients they serve. In a production version of the business, investors would hold real investment accounts. For this learning platform, all money and trades are virtual, but the workflows reflect a real wealth-management business.
+## The product
 
-The product has two connected workspaces.
+Chronos Wealth helps investors inspect investments and simulate trading. An
+advisor reviews the same financial information through a separate workspace.
+The sandbox uses virtual cash, historical market prices, and an account-specific
+simulated date. It places no real trades.
 
-- **Investor workspace:** An investor can see available cash, investments held, portfolio value, investment return, past trades, and market-performance charts. They can compare a small list of approved securities, preview a buy or sell, and execute a virtual trade.
-- **Advisor workspace:** A financial advisor can see a list of assigned clients and review each client's portfolio. The advisor can identify issues such as too much money in one security, too much uninvested cash, too little diversification, or poor performance. The advisor's workspace is read-only: advisors cannot place a trade for a client.
+Alice starts with $100,000 on June 1, 2020. She can buy or sell fractional shares
+of AAPL, MSFT, SPY, GLD, and JPM, advance time, and inspect her results. The Demo
+Advisor opens Alice's portfolio and reviews holdings, history, and performance
+without trading or changing time.
 
-Chronos Wealth already has reliable application services that calculate portfolio values, returns, holdings, trade eligibility, and risk flags. These calculations use market prices that were available only on the relevant date. For example, the system must never use a future price to explain a past decision or portfolio result. This is called a **point-in-time data rule**.
+Three AI features extend Alice's workspace:
 
-The company now wants to use AI to improve service and productivity. It wants AI to help people find information, explain facts, summarize, draft, and route work. It does **not** want AI to make up financial facts, override investment policy, view data it is not allowed to see, send unapproved communications, or execute trades on its own.
+| Feature | Business purpose | Information used |
+| --- | --- | --- |
+| Chatbot | Explain the investor's current portfolio in plain language. | Python-calculated portfolio facts, a question, and bounded conversation history. |
+| Handbook RAG | Explain investing concepts with supporting passages. | A shared, built-in handbook and the user's question. |
+| Portfolio agent | Explore current value and recorded value changes. | Two read-only tools for portfolio facts and saved observations. |
 
-## People and departments involved
+These features are implemented. AI runtime setup will be provided separately
+offline. An MCP server is planned for later; it is outside the current assessment.
 
-- **Investors / clients:** want clear answers about their accounts and investments.
-- **Financial advisors / relationship managers:** prepare for client meetings, explain portfolios, and draft follow-up communications.
-- **Investment research and portfolio-management teams:** maintain approved research, investment views, and portfolio guidelines.
-- **Risk management:** monitors concentration, diversification, cash allocation, and other portfolio-risk indicators.
-- **Compliance and legal:** ensures client communications and recommendations follow policy and regulatory requirements.
-- **Operations / trade support:** manages workflow completeness, exceptions, and record accuracy.
-- **Internal audit:** investigates incidents and tests whether processes and controls were followed.
-- **Technology and AI governance:** controls AI models, access, data handling, monitoring, testing, and incident response.
+## Your role
 
-## Your assignment
+You are the Product Security engineer reviewing this application. Your work has
+two parts: assess the conventional product and assess its AI integrations.
+AI can help you discover, analyze, and generate test ideas. You remain responsible
+for deciding whether an observation proves a security issue.
 
-Design five AI features for Chronos Wealth. You are not required to write code. Instead, explain how each feature should work in business and technology terms.
+The current demo is deliberately small: two seeded identities, one investor
+account, local SQLite storage, and a static handbook. Do not assume production
+identity services, assigned-client management, document upload, client messaging,
+or approval workflows exist. Treat a missing capability as a scope fact before
+deciding whether it creates a security finding.
 
-For each question, address:
+## Business expectations to assess
 
-1. **User and benefit:** Who uses it, and what business problem does it solve?
-2. **AI approach:** Is it best designed as a simple chatbot, a document-search assistant (RAG), a rules-based workflow with AI drafting, or an AI agent that can use tightly controlled tools? Why?
-3. **Information used:** What account data, market data, documents, or systems does it need? Who may access that information?
-4. **Controls:** What must be calculated or decided by the existing deterministic system rather than AI? What requires a human approval?
-5. **Risk and measurement:** What can go wrong, how will it be controlled, and how will Chronos Wealth know whether the feature is successful?
+| Expectation | Why it matters |
+| --- | --- |
+| A caller acts only with the authority they are entitled to. | A submitted identity or a hidden UI control must not substitute for server-side authority. |
+| Investors cannot read or change another investor's account. | Financial information and actions need ownership checks. |
+| Advisors review portfolios without executing investor actions. | Read access must not imply trading or time-change authority. |
+| A trade preserves valid cash, shares, and history. | Preview must be non-writing; execution must recheck facts and avoid partial updates. |
+| AI stays within its data and tool authority. | Untrusted questions, history, passages, or model output must not grant new access or actions. |
 
-**Helpful definitions:** A *chatbot* answers questions in conversation. *RAG* (retrieval-augmented generation) finds relevant approved documents before answering, so the answer can cite its sources. An *agent* is an AI application that can plan a multi-step task and call approved software tools. A *deterministic service* produces the same calculation or decision from the same inputs, such as a portfolio-value calculation or a policy threshold check.
+All financial reads must use prices on or before the simulated date. A model's
+explanation must not be mistaken for a new financial calculation or an executed
+trade. Source citations and tool traces are evidence to inspect, not automatic
+proof that an answer is correct.
 
-## Question 1 — Investor portfolio-explainer assistant
+## Assessment work
 
-An investor signs in and asks: “Why did my portfolio fall this month? How much of the decline came from AAPL? What does my current cash balance mean for my investment plan?”
+1. **Map one request.** Follow a portfolio read or trade from the UI through HTTP,
+   account lookup, rules, and database access. Record assets and trust boundaries.
+2. **Form and test an abuse hypothesis.** Examine identity, account targeting,
+   role changes, invalid amounts, repeated requests, or business state. Specify
+   expected behavior before testing.
+3. **Trace an AI request.** Inspect portfolio context and chat history, retrieved
+   handbook text, or proposed tool calls. Separate prompt instructions from
+   controls enforced by Python.
+4. **Reproduce or reject a finding.** Compare source analysis with responses and
+   stored state. Record failed hypotheses as well as confirmed issues.
+5. **Propose and verify a fix.** Define the invariant, make the smallest justified
+   change, run regression checks, and report remaining uncertainty.
 
-Design an investor-facing conversational assistant that explains the logged-in investor's portfolio in plain language. It may access that investor's portfolio, trade and account-value history, point-in-time market data, and approved educational content.
+Use AI on the same task after establishing your own baseline. Compare coverage,
+false positives, and evidence quality. No particular number of vulnerabilities
+is guaranteed by the sandbox.
 
-Recommend an AI design for this feature. Explain how the solution will use the investor's own account data only, show the source for factual claims, distinguish factual explanation from personal investment advice, avoid inventing prices or returns, and prevent the AI from placing a trade or making an unauthorized recommendation.
+## Evidence to deliver
 
-## Question 2 — Advisor meeting-preparation copilot
+For each finding, record:
 
-An advisor is preparing for a review with Alice. The advisor needs a concise briefing with portfolio value, cash ratio, largest holding, recent performance, trade activity, relevant risks, and suggested client discussion points. The advisor also wants a draft follow-up note after the meeting.
+- **Location and path:** source file/function, endpoint, and required starting state.
+- **Reproduction:** minimal request or input, expected result, and observed result.
+- **Impact:** affected data or action, attacker prerequisites, severity rationale,
+  and confidence; include CWE where appropriate.
+- **Remediation:** proposed control, regression evidence, and residual risk.
 
-Design an advisor copilot that creates this briefing and draft. Explain which information must come from the platform's portfolio-calculation services, where a policy-document search assistant would be useful, and how the system should answer a question such as, “Can Alice add more AAPL under the guideline?” Describe the advisor's review and approval process before a note is sent, and how the system keeps one client's information separate from another's.
+End with a release recommendation: what was assessed, what was confirmed, what
+was rejected, what remains untested, and what conditions must be met. Distinguish
+substituted-model tests from live-model observations.
 
-## Question 3 — Investment-policy RAG assistant
+## Scope
 
-Advisors and portfolio managers need reliable answers to questions such as: “Does this portfolio breach the concentration guideline?” and “What is the approved response to a high-cash allocation?” They need answers grounded in approved investment policies, suitability rules, product guidance, and research summaries.
-
-Design a policy-grounded document-search assistant (RAG). Describe how approved documents are stored, updated, found, and cited; how the platform's calculation services determine portfolio metrics and policy thresholds; and which tightly controlled tools the AI may use, such as current-price lookup, portfolio-allocation lookup, and guideline checking. Explain how you would test whether it finds the right policy, gives an answer supported by that policy, handles out-of-date documents, and refuses to answer when the evidence is insufficient.
-
-## Question 4 — Compliance communications-review workflow
-
-Compliance must review advisor emails, meeting notes, and AI-generated client drafts before they are sent. It needs to identify potentially misleading statements, unsuitable recommendations, missing disclosures, unapproved product language, promises of returns, and direct trade instructions.
-
-Design a compliance-review workflow that uses AI to identify risks, find relevant policy, and propose edits, but never independently approves a client communication or rewrites official policy. Explain the mix of rules, AI classification, document search, and AI reasoning. Show the process from draft to review, revision, approval or rejection, and an audit record. Also describe when a high-risk item must be escalated and how the firm will measure missed risks and unnecessary alerts.
-
-## Question 5 — Internal-audit and AI-governance investigation assistant
-
-Internal audit receives a complaint that an AI assistant exposed information about another client and encouraged an unauthorized trade. Auditors need to investigate the complete interaction without receiving broad, unrestricted access to all client data.
-
-Design a read-only audit and AI-governance assistant that can investigate access logs, AI inputs and outputs, documents used to answer a question, software-tool calls, approvals, policy versions, and user actions. State what evidence must be recorded for every AI interaction; how the assistant accesses only the minimum information necessary; how its findings can be traced to the AI model, instructions, documents, and tool results used; and which actions it must never be permitted to perform. Include tests for malicious instructions, client-data leakage, excessive data requests, and attempts to trade, delete records, or use an unrestricted database query.
-
-## Design principle
-
-AI may explain, retrieve, summarize, draft, classify, and assist. Deterministic services calculate financial facts; policy gates enforce business rules; and a suitably authorized human remains accountable for consequential advice, communications, and actions.
+Use the authorized local sandbox and synthetic identities. Preserve a repeatable
+starting state; reset only when the scenario calls for it. Additional test
+identities must be created explicitly—the shipped UI seeds only Alice and Demo
+Advisor. Scanner outputs, external infrastructure, and future MCP behavior need
+separate evidence if introduced into an assessment.
