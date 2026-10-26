@@ -52,7 +52,6 @@ After the business stories, read the relevant file in [engineering/](engineering
 | [test_query_counts.py](engineering/test_query_counts.py) | Bounded SQL queries as holdings, dates, and requested symbols grow. |
 | [test_transactions.py](engineering/test_transactions.py) | Real request commits, failed-write rollback, and preview non-mutation. |
 | [test_ui.py](engineering/test_ui.py) | Offline Streamlit rendering, request counts, stale previews, and chat replies, clearing and connection errors. |
-| [test_labs.py](engineering/test_labs.py) | Current starter registration and governed MCP helper behavior. |
 | [test_ai.py](engineering/test_ai.py) | Optional LlamaIndex lessons and their HTTP endpoints: bounded chat, retrieved evidence, executed read-tool traces, limits, permission checks and visible errors, with network responses replaced. |
 
 Business examples and boundary checks sometimes exercise the same rule for

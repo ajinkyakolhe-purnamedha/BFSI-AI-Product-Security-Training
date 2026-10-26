@@ -1,145 +1,146 @@
-# Chronos Wealth — Module 0
+# Chronos Wealth
 
-A working Python wealth-management simulator for the 5-day Enterprise AI and
-GenAI training. Virtual money, synthetic time, real historical prices.
-Educational software only — no real trades, no financial advice, and no LLM
-key required.
+**Start with [Run the app](#run-the-app).** Then try the [business workflows](#business-workflows).
 
-```text
-Investor side = deterministic finance app
-Advisor side = deterministic, read-only client workspace
-Python calculates. AI explains, retrieves, reasons, and assists.
-```
+A standalone wealth-management sandbox for product security training. It includes
+investor and advisor screens, an API, and chatbot, RAG, and agent features.
+All money and trades are virtual.
 
-Later course labs add those AI capabilities through Chronos's deterministic
-data and policy boundaries; the baseline application does not simulate them.
-Three optional standalone LlamaIndex lessons now live in
-[chronos/ai/](chronos/ai/README.md): portfolio chat, handbook RAG, and a read-only
-portfolio exploration agent. Each is a separate runnable file using local Ollama.
-The investor dashboard exposes all three in **AI Demo → Chatbot | RAG | Agent**.
-See [AI demo setup](chronos/ai/README.md#demo-the-ai-tabs).
+## Run the app
 
-New to this repository? Start with the [repository onboarding guide](repo_onboarding_guide/README.md)
-for the project goals, setup, architecture, code-reading order, workflows, lab
-status, tests, and troubleshooting.
+You need **Python 3.13** and **[uv](https://docs.astral.sh/uv/getting-started/installation/)**.
+Open a terminal in `project-bfsi-sandbox_WealthManagement`.
 
-## Stack
-
-Python 3.13 · uv · FastAPI · Pydantic v2 · SQLAlchemy · SQLite · Pandas ·
-yfinance · Streamlit · pytest
-
-## Setup
+### 1. Install dependencies — first time only
 
 ```bash
 uv sync
-uv run python -m scripts.load_market_data   # yfinance -> CSV -> SQLite (one-time, needs network)
 ```
 
-For the optional M12 Governed MCP extension, install its local MCP dependency:
+### 2. Download market data — first time only
+
+Requires internet. After this, the core app uses local prices.
 
 ```bash
-uv sync --extra m12
+uv run python -m scripts.load_market_data
 ```
 
-The load script downloads AAPL, MSFT, SPY, GLD, JPM daily prices
-(2020-01-01 to 2021-12-31) into `data/market/prices.csv` and the SQLite
-`prices` table. The app never calls yfinance at runtime; if the database is
-empty it loads the CSV, and if the CSV is missing it tells you to run the
-script.
-
-## Run
+### 3. Start the backend — Terminal 1
 
 ```bash
-uv run uvicorn chronos.app_startup:app --reload    # API at http://127.0.0.1:8000
-uv run streamlit run ui/app_navigation.py              # UI  at http://localhost:8501
+uv run uvicorn chronos.app_startup:app --reload
 ```
 
-Demo logins (no passwords):
+Leave this running. [Check backend health](http://127.0.0.1:8000/health):
+it should show `{"status":"ok"}`.
 
-```text
-Alice Investor   alice@example.com    INVESTOR
-Demo Advisor     advisor@example.com  ADVISOR
-```
+### 4. Start the UI — Terminal 2
 
-Alice starts with $100,000 virtual cash at simulated date 2020-06-01. Demo
-Advisor can review Alice's portfolio through a read-only workspace.
-Reset everything back to that state with:
+Open a second terminal in the **same project folder**:
 
 ```bash
-uv run python -m scripts.reset_demo_data    # or POST /demo/reset
+uv run streamlit run ui/app_navigation.py
 ```
 
-## Test
+Leave both terminals running. Stop each with `Ctrl+C`.
+
+### 5. Open the app and select a user
+
+Open **[http://localhost:8501](http://localhost:8501)**. No password is required.
+
+| User | Email | What they can do |
+| --- | --- | --- |
+| Alice Investor | alice@example.com | Trade, advance time, review her portfolio, use AI |
+| Demo Advisor | advisor@example.com | Review Alice's portfolio and performance |
+
+Alice starts with **$100,000 cash on June 1, 2020**.
+
+**App will not open?** Check that Terminal 2 is still running.
+**404 at port 8000?** Open **8501** for the app.
+The backend's [API documentation is at port 8000/docs](http://127.0.0.1:8000/docs).
+
+## What the app does
+
+### Investing and portfolio review
+
+| Feature | What you can do |
+| --- | --- |
+| Portfolio dashboard | See cash, holdings, total value, and return. Inspect shares, average cost, current prices, allocation, and unrealized gains/losses. |
+| Buy and sell | Enter a dollar amount, preview price/shares/eligibility, and confirm. Fractional shares are supported. Invalid amounts, insufficient cash, and insufficient shares are rejected. |
+| Time and history | Advance one week, month, or quarter within available market dates. See trade history and portfolio values saved after trades and time advances. |
+| Market comparison | Compare AAPL, MSFT, SPY, GLD, and JPM, including best/worst performers. Advisors can compare a symbol with its peers' average. |
+| Advisor workspace | Review Alice's holdings, trades, saved values, and charts. Advisors cannot trade or advance time. |
+
+**The rules:** Python calculates financial results. Prices never come from after
+the simulated date. Preview changes no financial records; confirmation rechecks
+the trade. Failed operations roll back their database changes.
+
+Activity persists in `data/chronos.db`. Prices are prepared in
+`data/market/prices.csv`. History saves observations, not a value for every day.
+The API exposes portfolio reads, trading, time advancement, login, AI, and reset.
+
+### AI features — setup will be provided offline
+
+| Feature | What you can inspect |
+| --- | --- |
+| Chatbot | Answers using refreshed portfolio facts and up to three completed conversation turns. Clear chat to start again. |
+| Handbook RAG | Searches six built-in handbook documents. Shows retrieved passages, similarity scores, and an answer prompted to cite its sources. Returns a no-evidence response when no passage meets the threshold. |
+| Portfolio agent | Reads current portfolio facts or the last five saved values. Shows executed tools and results. Python fixes the investor identity, checks tool names/arguments, and limits execution to four tool calls. No write tools are exposed. |
+
+**Planned:** an MCP server will be added later.
+
+## Business workflows
+
+1. **Make an investment:** log in as Alice → choose BUY, a symbol, and an amount →
+   preview → confirm → inspect cash, holdings, and the recorded trade.
+2. **Sell an investment:** choose SELL and an amount → preview available shares →
+   confirm → inspect the updated position and cash.
+3. **Review performance:** advance time → inspect the value change and recorded
+   history → compare assets. Log in as Demo Advisor to review Alice's results.
+4. **Explore with AI:** open Alice's AI Demo tabs → ask about her portfolio,
+   search the handbook, or run the agent → inspect sources or tool results.
+5. **Repeat the demo:** reset to $100,000, June 1, 2020, no holdings or trades,
+   and one initial value observation. Downloaded prices remain.
+
+Reset **clears existing demo investment activity**:
 
 ```bash
-uv run pytest
+uv run python -m scripts.reset_demo_data
 ```
 
-Tests use `tests/fixtures/prices_sample.csv` and never call yfinance or the
-network.
+## AI setup
 
-## Layout
+AI setup will be provided separately offline. Once configured, open Alice's
+**AI Demo** section and try:
 
-```text
-chronos/    flat business capabilities, pure rules, and API boundaries
-  business_investor_accounts.py     authorized viewer/target and investor account lookup
-  business_investor_trading.py       price, preview, apply and record virtual trades
-  rules_trade_eligibility_and_cost.py           affordability decisions and average-cost arithmetic
-  business_portfolio_valuation.py   current holdings valued at dated prices
-  business_portfolio_history.py     save and read recorded portfolio values
-  market_historical_prices.py         dated single/batch queries and symbol history
-  market_price_import.py   one-time preparation, validation and import
-  business_simulated_time.py      calendar steps and date advancement
-  storage_sqlite_tables_and_sessions.py  ORM tables and transaction lifecycle
-  api_routes_*.py          portfolio/actions and system HTTP boundaries
-  api_schemas_requests_and_responses.py           shared screen and action contracts
-  ai/                     independent optional chatbot, RAG, and agent lessons
-ui/         shared view_shared_portfolio.py plus persona screens; client_backend_api.py owns HTTP
-labs/       optional M1–M15 starters; their exercise behavior is unchanged
-scripts/    one-time loading and intentional demo reset
-tests/     offline rules, workflows, HTTP and transaction checks
-data/      generated database and market CSV
+- **Chatbot:** “Why is portfolio value different from cash?”
+- **RAG:** “What is unrealized gain?”
+- **Agent:** “Explain my portfolio value history.”
+
+## Security review context
+
+- **Identity:** demo login selects a user. API requests supply user IDs; there
+  is no authenticated session establishing the caller's identity.
+- **Access:** role checks restrict investor/advisor actions. Advisors can read
+  investor accounts without an assigned-client relationship check.
+- **AI data:** RAG searches a shared static handbook. Chat history comes from
+  the request. Inspect prompts, retrieved content, and tool execution separately.
+
+## Run the tests
+
+```bash
+uv run --extra ai python -m pytest -q
 ```
 
-Key rule everywhere: every price lookup uses the latest price on or before
-the account's simulated date — no feature can see the future.
+Tests use temporary databases, fixture prices, and substituted model/network
+responses. They cover financial rules, access, validation, rollback, UI behavior,
+and AI boundaries. Live-model behavior needs separate assessment.
+For core-only tests, omit `--extra ai`; optional AI checks may skip.
 
-The live demo intentionally has two personas only: Alice Investor and Demo
-Advisor. The advisor can view Alice's portfolio but cannot trade for her.
+## Read more
 
-
-## Read the business workflow
-
-Start with the investor journey test, follow its trade route into
-`business_investor_trading.execute_investor_trade`, then read `rules_trade_eligibility_and_cost` and dated
-`market_historical_prices` queries. Workflows obtain facts and apply changes; rule functions
-calculate or decide without database, HTTP, or UI dependencies.
-
-Preview and execution share eligibility rules. Snapshot and history share missing/
-invalid-price behavior. Current valuation uses at most two SELECTs; history uses
-at most three on loaded account inputs. Request owners commit or roll back the
-complete operation. Trade amounts must be finite/positive and history limits
-must be 1..1000; invalid imports are rejected before changing stored prices.
-
-## Two screens, one portfolio
-
-Both personas read `GET /portfolio?user_id=<viewer>`; the advisor opens Alice
-directly. The response includes summary, holdings, assets, history, and trades.
-`GET /market/history` fetches selected symbols together at the investor's date.
-Each normal dashboard render uses two read requests. Only investors can preview
-or execute trades and advance time. Advancing refreshes the screen and clears
-the previous preview.
-
-The API now has one schema module and two routers. Fragmented account/assets/
-history reads and separate advisor endpoints have been removed. See the
-[current API guide](repo_onboarding_guide/05_workflows_and_api.md) for contracts.
-New market CSVs contain symbol/date/close/source; existing wider CSVs and legacy
-optional price columns remain usable.
-
-Read [the five business test stories](tests/README.md) to learn the application through concrete examples. Deeper checks live in `tests/engineering/`.
-
-Recorded Portfolio Values stores one observation per account/date. Creation and
-reset save the initial value; trades update today's observation; advancing time
-saves the destination date. A month jump does not fill intervening dates. Existing
-accounts without observations are initialized at their current date on startup;
-price corrections preserve saved history.
+- [Project guide](PROJECT_GUIDE.md) — architecture and business logic.
+- [AI guide](chronos/ai/README.md) — prompts, retrieval, tools, and terminal commands.
+- [Test guide](tests/README.md) — business examples and focused checks.
+- [API routes](chronos/api_routes_portfolio.py) — portfolio, trades, and AI entry points.
+- [Account access](chronos/business_investor_accounts.py) — viewer and investor checks.
